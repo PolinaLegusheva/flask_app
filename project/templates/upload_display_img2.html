@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1 class="title">
+        Welcome to Quick&Clean!
+    </h1>
+    <h2 class="subtitle">
+        Quickly clear your text in one click.
+    </h2>
+    <h1>Upload a dirty image and display the result</h1>
+    <form method="POST" enctype="multipart/form-data" action="/">
+        <input type="file" id="myFile" name="uploaded-file" accept=".png">
+        <input type="submit" value="Submit">
+    </form>
+  <br>
+  <p style="color:green;">File uploaded successfully</p>
+  <form action="/show_image" target="_blank">
+        <input type="submit" value="Display Image" />
+    </form>
+
+{% endblock %}
