@@ -1,5 +1,8 @@
+import cv2
+import numpy as np
 from flask import Blueprint, render_template, request, session
 from flask_login import login_required, current_user, LoginManager
+from tensorflow import keras
 from run import app
 from db import db
 import os
@@ -7,14 +10,15 @@ from models import User
 from auth import auth as auth_blueprint
 from flask import send_file
 from werkzeug.utils import secure_filename
+from PIL import Image
 
 # WSGI Application
 # Defining upload folder path
 UPLOAD_FOLDER = os.path.join('staticFiles', 'uploads')
-
 main = Blueprint('main', __name__, template_folder='templates', static_folder='staticFiles')
-
 last_uploaded_file = None
+image_path = '/home/pl/PycharmProjects/flask_app/project/staticFiles/uploads/4.png'
+
 
 @main.route('/profile')
 @login_required
@@ -27,8 +31,23 @@ def index():
     return render_template('upload_display_img.html')
 
 
+model = keras.models.load_model('/home/pl/Documents/practice_data/')
+
+
+def process_image(image_path):
+    # Открытие изображения
+    image = cv2.imread(image_path)
+    # Обработка изображения
+    processed_image = np.expand_dims(cv2.resize(image, (270, 210)), 0)
+    # Предсказание с помощью модели
+    prediction = model.predict(processed_image)
+
+    return prediction
+
+
 @main.route('/', methods=("POST", "GET"))
 def uploadFile():
+
     if request.method == 'POST':
         global last_uploaded_file
         # Upload file flask
@@ -38,10 +57,11 @@ def uploadFile():
         # Upload file to database (defined uploaded folder in static path)
         uploaded_img.save(os.path.join(UPLOAD_FOLDER, img_filename))
         # Storing uploaded file path in flask session
-        session['uploaded_img_file_path'] = os.path.join(UPLOAD_FOLDER, img_filename)
-        last_uploaded_file = img_filename
-
-        return render_template('upload_display_img2.html')
+        global last_uploaded_file
+        last_uploaded_file = os.path.join(UPLOAD_FOLDER, img_filename)
+        process_image(last_uploaded_file)
+        session['uploaded_img_file_path'] = last_uploaded_file
+        return render_template('show_img.html', user_image=last_uploaded_file)
 
 
 @main.route('/show_image')
