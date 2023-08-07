@@ -4,26 +4,28 @@ from flask import Blueprint, render_template, request, session
 from flask_login import login_required, current_user, LoginManager
 from tensorflow import keras
 from run import app
-from db import db
+from models import db
 import os
 from models import User
 from auth import auth as auth_blueprint
 from flask import send_file
 from werkzeug.utils import secure_filename
-from PIL import Image
 
 # WSGI Application
 # Defining upload folder path
 UPLOAD_FOLDER = os.path.join('staticFiles', 'uploads')
 main = Blueprint('main', __name__, template_folder='templates', static_folder='staticFiles')
 last_uploaded_file = None
-image_path = '/home/pl/PycharmProjects/flask_app/project/staticFiles/uploads/4.png'
 
 
 @main.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html', name=current_user.name)
+    session['count'] = session.get('count', 0) + 1
+    calculation = User(count=session['count'])
+    db.session.add(calculation)
+    db.session.commit()
+    return render_template('profile.html', name=current_user.name, count=session['count'])
 
 
 @main.route('/')
@@ -31,12 +33,12 @@ def index():
     return render_template('upload_display_img.html')
 
 
-model = keras.models.load_model('/home/pl/Documents/practice_data/')
+model = keras.models.load_model('/home/pl/Documents/practice_data/model')
 
 
 def process_image(image_path):
     # Открытие изображения
-    image = cv2.imread(image_path)
+    image = cv2.imread(UPLOAD_FOLDER)
     # Обработка изображения
     processed_image = np.expand_dims(cv2.resize(image, (270, 210)), 0)
     # Предсказание с помощью модели
@@ -57,11 +59,9 @@ def uploadFile():
         # Upload file to database (defined uploaded folder in static path)
         uploaded_img.save(os.path.join(UPLOAD_FOLDER, img_filename))
         # Storing uploaded file path in flask session
-        global last_uploaded_file
-        last_uploaded_file = os.path.join(UPLOAD_FOLDER, img_filename)
-        process_image(last_uploaded_file)
-        session['uploaded_img_file_path'] = last_uploaded_file
-        return render_template('show_img.html', user_image=last_uploaded_file)
+        session['uploaded_img_file_path'] = os.path.join(UPLOAD_FOLDER, img_filename)
+        last_uploaded_file = img_filename
+        return render_template('upload_display_img2.html')
 
 
 @main.route('/show_image')
@@ -72,7 +72,7 @@ def displayImage():
     return render_template('show_img.html', user_image=img_file_path)
 
 
-@app.route('/download')
+@main.route('/download')
 def download():
     global last_uploaded_file
     if last_uploaded_file:
