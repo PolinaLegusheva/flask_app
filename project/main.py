@@ -10,19 +10,18 @@ from models import User
 from auth import auth as auth_blueprint
 from flask import send_file
 from werkzeug.utils import secure_filename
+from PIL import Image
+import time
 
-# WSGI Application
-# Defining upload folder path
-UPLOAD_FOLDER = os.path.join('staticFiles', 'uploads')
+
 main = Blueprint('main', __name__, template_folder='templates', static_folder='staticFiles')
-last_uploaded_file = None
 
 
 @main.route('/profile')
 @login_required
 def profile():
     session['count'] = session.get('count', 0) + 1
-    calculation = User(count=session['count'])
+    calculation = User()
     db.session.add(calculation)
     db.session.commit()
     return render_template('profile.html', name=current_user.name, count=session['count'])
@@ -30,53 +29,52 @@ def profile():
 
 @main.route('/')
 def index():
+    return render_template('index.html')
+
+
+@main.route('/home')
+def home():
     return render_template('upload_display_img.html')
 
 
 model = keras.models.load_model('/home/pl/Documents/practice_data/model')
 
 
-def process_image(image_path):
-    # Открытие изображения
-    image = cv2.imread(UPLOAD_FOLDER)
-    # Обработка изображения
-    processed_image = np.expand_dims(cv2.resize(image, (270, 210)), 0)
-    # Предсказание с помощью модели
-    prediction = model.predict(processed_image)
+def process_image(image):
+    # Загрузите серое изображение
+    img = Image.open(image).convert('L')
+    img = img.resize((270, 210))
+    # Произведите преобразование из серого в цветное
+    img_array = np.array(img)
+    img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2RGB)
+    # Расширьте размерность массива изображения
+    img_array = np.expand_dims(img_array, axis=0)
+    # Получите прогноз цветных значений пикселей
+    prediction = model.predict(img_array/255.0)
+    # Преобразуйте массив прогнозов в изображение
+    processed_img = Image.fromarray(np.uint8(prediction[0]*255.0))
 
-    return prediction
+    return processed_img
 
 
-@main.route('/', methods=("POST", "GET"))
+@main.route('/home', methods=["POST"])
 def uploadFile():
-
-    if request.method == 'POST':
-        global last_uploaded_file
-        # Upload file flask
-        uploaded_img = request.files['uploaded-file']
-        # Extracting uploaded data file name
-        img_filename = secure_filename(uploaded_img.filename)
-        # Upload file to database (defined uploaded folder in static path)
-        uploaded_img.save(os.path.join(UPLOAD_FOLDER, img_filename))
-        # Storing uploaded file path in flask session
-        session['uploaded_img_file_path'] = os.path.join(UPLOAD_FOLDER, img_filename)
-        last_uploaded_file = img_filename
-        return render_template('upload_display_img2.html')
+    image = request.files['image']
+    processed_img = process_image(image)
+    processed_img.save('staticFiles/uploads' + image.filename)
+    return render_template('upload_display_img2.html', processed_img=image.filename)
 
 
-@main.route('/show_image')
-def displayImage():
-    # Retrieving uploaded file path from session
-    img_file_path = session.get('uploaded_img_file_path', None)
-    # Display image in Flask application web page
-    return render_template('show_img.html', user_image=img_file_path)
+@app.route('/processed/<filename>')
+def processed(filename):
+    return send_file('staticFiles/uploads' + filename, mimetype='image/png')
 
 
-@main.route('/download')
-def download():
-    global last_uploaded_file
-    if last_uploaded_file:
-        return send_file(os.path.join(UPLOAD_FOLDER, last_uploaded_file), as_attachment=True)
+@app.route('/download/<filename>')
+def download(filename):
+
+    if filename:
+        return send_file('staticFiles/uploads' + filename, as_attachment=True)
     else:
         return '<h1>No files uploaded yet</h1>'
 
