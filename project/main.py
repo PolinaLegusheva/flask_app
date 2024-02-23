@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from flask import Blueprint, render_template, request, session
+from flask import Blueprint, render_template, request, session, url_for
 from flask_login import login_required, current_user, LoginManager
 from tensorflow import keras
 from run import app
@@ -9,7 +9,7 @@ import os
 from models import User
 from auth import auth as auth_blueprint
 from flask import send_file
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename, redirect
 from PIL import Image
 import time
 
@@ -20,11 +20,16 @@ main = Blueprint('main', __name__, template_folder='templates', static_folder='s
 @main.route('/profile')
 @login_required
 def profile():
-    session['count'] = session.get('count', 0) + 1
-    calculation = User()
-    db.session.add(calculation)
-    db.session.commit()
-    return render_template('profile.html', name=current_user.name, count=session['count'])
+    return render_template('profile.html', name=current_user.name, count=current_user.count)
+
+
+@main.route('/compute', methods=['POST'])
+@login_required
+def compute():
+    if request.form.get('compute') == 'Show number of calculation':
+        current_user.count += 1
+        db.session.commit()
+        return redirect(url_for('main.profile'))
 
 
 @main.route('/')
@@ -62,6 +67,7 @@ def uploadFile():
     image = request.files['image']
     processed_img = process_image(image)
     processed_img.save('staticFiles/uploads' + image.filename)
+
     return render_template('upload_display_img2.html', processed_img=image.filename)
 
 
@@ -100,4 +106,4 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)

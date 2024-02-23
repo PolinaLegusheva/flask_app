@@ -20,4 +20,7 @@
     <a href="{{url_for('download', filename=processed_img)}}">
         <button type="submit">Save Result</button>
     </a>
+    <form method="POST" enctype="multipart/form-data" action="/compute">
+        <input type="submit" name="compute" value="Show number of calculation">
+    </form>
 {% endblock %}
